@@ -13,16 +13,17 @@ var pp = utils.pp
 
 var id = 0
 var STAGE_EL = document.body
+var CONTROLS_EL = document.getElementById('controls')
 
 function Node (parent, children, position, size) {
   this.id = id++
-  this.parent = parent
-  if (this.parent) this.parent.children.push(this)
   this.children = children
   this.position = position
   this.size = size
   this.rotation = 0
   this.scale = [1, 1]
+  this.parent = null
+  this.setParent(parent)
   Object.defineProperty(this, 'aspectRatio', {
     get() { return this.size[0] / this.size[1] }
   })
@@ -50,9 +51,16 @@ function Node (parent, children, position, size) {
 }
 
 Node.prototype.setParent = function (parent) {
-  if (this.parent)                      remove(this.parent.children, this)
-  if (!contains(parent.children, this)) parent.children.push(this)
+  if (this.parent) remove(this.parent.children, this)
   this.parent = parent      
+
+  if (parent) {
+    if (!contains(parent.children, this)) parent.children.push(this)
+    if (parent.parent == null) {
+      parent.size[0] = Math.max(parent.size[0], this.size[0] + this.position[0])
+      parent.size[1] = Math.max(parent.size[1], this.size[1] + this.position[1])
+    }
+  }
 }
 
 function Box (parent, position, size, color) {
@@ -60,19 +68,19 @@ function Box (parent, position, size, color) {
   this.color = color
 }
 
-Box.prototype = Node.prototype
+Box.prototype = Object.create(Node.prototype)
 
 function Root () {
-  Node.call(this, null, [], [0, 0], [Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER])
+  Node.call(this, null, [], [0, 0], [0, 0])
 }
 
-Root.prototype = Node.prototype
+Root.prototype = Object.create(Node.prototype)
 
 function Camera (position, size) {
   Node.call(this, null, [], position, size)
 }
 
-Camera.prototype = Node.prototype
+Camera.prototype = Object.create(Node.prototype)
 
 function renderDebug (parentNode, node) {
   var props  = {
@@ -113,28 +121,29 @@ function renderNode (parentNode, node) {
   return h('div', props, [debug, ...children])
 }
 
-function renderFromCamera (camera, node) {
-  var pos = vec2.transformMat3([0, 0], node.position, camera.matrixInverse)
-  var xPercent = toPercent(pos[0], camera.size[0])
-  var yPercent = toPercent(pos[1] / camera.aspectRatio, camera.size[1])
+function renderRoot (camera, node) {
+  //TODO: pretty sure this is wrong?  position should be done via matrix mult?
+  var xPercent = toPercent(node.position[0] - camera.position[0], camera.size[0])
+  var yPercent = toPercent(node.position[1] - camera.position[1], camera.size[1])
   var wPercent = toPercent(node.size[0], camera.size[0])
   var hPercent = toPercent(node.size[1], camera.size[1])
   var props = {
+    id: 'root',
     className: 'node',
     style: {
+      position: 'absolute',
+      overflow: 'hidden',
+      backgroundColor: node.color || 'white',
       width: `${wPercent}%`,
       height: `${hPercent}%`,
-      position: 'absolute',
-      backgroundColor: node.color,
+      transformOrigin: `${xPercent}% ${yPercent}`,
       transform: `translate3d(${xPercent}%, ${yPercent}%, 0) ` +
-                 `rotate(${toDegrees(node.rotation + camera.rotation)}deg) ` +
-                 `scale(${node.scale[0]}, ${node.scale[1]})`
+                 `rotate(${toDegrees(-camera.rotation)}deg)`
     }
   }
   var children = node.children.map(c => renderNode(node, c))
-  var debug = renderDebug(camera, node)
 
-  return h('div', props, [debug, ...children])
+  return h('div', props, children)
 }
 
 function renderScene (el, camera, scene) {
@@ -153,22 +162,9 @@ function renderScene (el, camera, scene) {
       height: `${toPercent(hStage, hMax)}%`
     }
   }
-  var sliderProps = {
-    type: 'range',
-    min: 0,
-    max: Math.PI / 2,
-    step: Math.PI / 64,
-    oninput: function (e) { camera.rotation = Number(e.target.value) },
-    style: {
-      position: 'absolute',
-      zIndex: 1000
-    }
-  }
-  var children = scene.children.map(c => renderFromCamera(camera, c))
-  var slider = h('input', sliderProps) 
-  var debug = renderDebug(camera, scene)
+  var root = renderRoot(camera, scene)
 
-  return h('div', props, [debug, slider, ...children])
+  return h('div', props, root)
 }
 
 var camera = new Camera([0, 0], [240, 135])
@@ -177,21 +173,29 @@ var b1 = new Box(scene, [10, 10], [100, 100], 'green')
 var b2 = new Box(scene, [300, 50], [50, 50], 'blue')
 var b3 = new Box(scene, [200, 100], [75, 75], 'red')
 var b4 = new Box(b3, [25, 0], [25, 25], 'pink')
+var gui = new dat.GUI({autoPlace: false})
+var controls = {
+  wander: function () {
+    camera.position[0] = Math.random() * 50
+    camera.position[1] = Math.random() * 50
+    camera.rotation = Math.random() * Math.PI * 2
+  }
+}
 
-window.camera = camera
-window.scene = scene
-
-//TODO: for testing transforms
-
-camera.rotation = Math.PI / 8
 b3.rotation = Math.PI / 8
 b4.rotation = Math.PI / 8
+
+gui.add(camera.position, '0', -50, 50)
+gui.add(camera.position, '1', -50, 50)
+gui.add(camera, 'rotation', 0, Math.PI * 2)
+gui.add(controls, 'wander')
 
 function makeRender () {
   var oldTree = renderScene(STAGE_EL, camera, scene)
   var root = createElement(oldTree)
 
   STAGE_EL.appendChild(root)
+  CONTROLS_EL.appendChild(gui.domElement)
   return function render () {
     var newTree = renderScene(STAGE_EL, camera, scene)
     var patches = diff(oldTree, newTree)

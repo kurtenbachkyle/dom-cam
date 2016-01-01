@@ -9,6 +9,12 @@ body {
   background-color: gray;
 }
 
+#controls {
+  position: fixed;
+  right: 0;
+  z-index: 100000;
+}
+
 .debug {
   line-height: 0px;
   font-size: 10px;
