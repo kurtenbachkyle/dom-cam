@@ -1,0 +1,33 @@
+{
+  "name": "domcam",
+  "version": "1.0.0",
+  "description": "Dom camera API that uses CSS3 transform API to view a DOM tree positioned in virtual space",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test",
+    "watch": "http-server -p 1234 & watchify -d -o public/app.js src/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stevekane/dom-cam.git"
+  },
+  "keywords": [
+    "DOM",
+    "css3",
+    "camera2d",
+    "camera"
+  ],
+  "author": "Steve Kane",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/stevekane/dom-cam/issues"
+  },
+  "homepage": "https://github.com/stevekane/dom-cam#readme",
+  "devDependencies": {
+    "virtual-dom": "^2.1.1"
+  },
+  "dependencies": {
+    "gl-mat3": "^1.0.0",
+    "gl-vec2": "^1.0.0"
+  }
+}
