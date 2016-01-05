@@ -82,33 +82,21 @@ function Camera (position, size) {
 
 Camera.prototype = Object.create(Node.prototype)
 
-function renderDebug (parentNode, node) {
-  var props  = {
-    className: 'debug',
-    style: {
-      position: 'absolute',
-      bottom: 0
-    }
-  }
-  
-  return h('div', props, [
-    h('p', null, `pos:  ${node.position}`),
-    h('p', null, `ppos: ${parentNode.position}`),
-    h('p', null, `psz:  ${parentNode.size}`)
-  ])
-}
-
 function renderNode (parentNode, node) {
-  var xPercent = toPercent(node.position[0], parentNode.size[0])
-  var yPercent = toPercent(node.position[1] / parentNode.aspectRatio, parentNode.size[1])
+  var xPercent = toPercent(node.position[0], node.size[0])
+  var yPercent = toPercent(node.position[1], node.size[1])
   var wPercent = toPercent(node.size[0], parentNode.size[0])
   var hPercent = toPercent(node.size[1], parentNode.size[1])
+  var xOffsetPercent = 50 - toPercent(node.size[0] / 2, parentNode.size[0])
+  var yOffsetPercent = 50 - toPercent(node.size[1] / 2, parentNode.size[1])
   var props = {
     className: 'node',
     style: {
+      position: 'absolute',
+      left: `${xOffsetPercent}%`,
+      top: `${yOffsetPercent}%`,
       width: `${wPercent}%`,
       height: `${hPercent}%`,
-      position: 'absolute',
       backgroundColor: node.color,
       transform: `translate3d(${xPercent}%, ${yPercent}%, 0) ` +
                  `rotate(${toDegrees(node.rotation)}deg) ` +
@@ -116,32 +104,32 @@ function renderNode (parentNode, node) {
     }
   }
   var children = node.children.map(c => renderNode(node, c))
-  var debug = renderDebug(parentNode, node)
 
-  return h('div', props, [debug, ...children])
+  return h('div', props, children)
 }
 
-function renderRoot (camera, node) {
-  //TODO: pretty sure this is wrong?  position should be done via matrix mult?
-  var xPercent = toPercent(node.position[0] - camera.position[0], camera.size[0])
-  var yPercent = toPercent(node.position[1] - camera.position[1], camera.size[1])
+function renderFromCamera (camera, node) {
+  var position = vec2.transformMat3([0, 0], node.position, camera.matrixInverse)
+  var xPercent = toPercent(position[0], node.size[0])
+  var yPercent = toPercent(position[1], node.size[1])
   var wPercent = toPercent(node.size[0], camera.size[0])
   var hPercent = toPercent(node.size[1], camera.size[1])
+  var xOffsetPercent = -toPercent(node.size[0] / 2, camera.size[0])
+  var yOffsetPercent = -toPercent(node.size[1] / 2, camera.size[1])
   var props = {
-    id: 'root',
-    className: 'node',
     style: {
       position: 'absolute',
-      overflow: 'hidden',
-      backgroundColor: node.color || 'white',
+      left: `${xOffsetPercent}%`,
+      top: `${yOffsetPercent}%`,
       width: `${wPercent}%`,
       height: `${hPercent}%`,
-      transformOrigin: `${xPercent}% ${yPercent}`,
+      backgroundColor: node.color,
       transform: `translate3d(${xPercent}%, ${yPercent}%, 0) ` +
-                 `rotate(${toDegrees(-camera.rotation)}deg)`
+                 `rotate(${toDegrees(node.rotation)}deg) ` +
+                 `scale(${node.scale[0]}, ${node.scale[1]})`
     }
   }
-  var children = node.children.map(c => renderNode(node, c))
+  var children = node.children.map(n => renderNode(node, n))
 
   return h('div', props, children)
 }
@@ -151,6 +139,8 @@ function renderScene (el, camera, scene) {
   var hMax = el.clientHeight
   var wStage = wMax / hMax <= camera.aspectRatio ? wMax : camera.aspectRatio * hMax
   var hStage = wStage / camera.aspectRatio
+  var wPercent = toPercent(wStage, wMax)
+  var hPercent = toPercent(hStage, hMax)
   var props = {
     id: 'stage',
     style: {
@@ -158,37 +148,32 @@ function renderScene (el, camera, scene) {
       position: 'relative',
       overflow: 'hidden',
       backgroundColor: 'white',
-      width: `${toPercent(wStage, wMax)}%`,
-      height: `${toPercent(hStage, hMax)}%`
+      width: `${wPercent}%`,
+      height: `${hPercent}%`
     }
   }
-  var root = renderRoot(camera, scene)
+  var root = scene.children.map(n => renderFromCamera(camera, n))
 
   return h('div', props, root)
 }
 
-var camera = new Camera([0, 0], [240, 135])
+var camera = new Camera([-240, -135], [480, 270])
 var scene = new Root
-var b1 = new Box(scene, [10, 10], [100, 100], 'green')
-var b2 = new Box(scene, [300, 50], [50, 50], 'blue')
-var b3 = new Box(scene, [200, 100], [75, 75], 'red')
-var b4 = new Box(b3, [25, 0], [25, 25], 'pink')
+var b1 = new Box(scene, [0, 0], [75, 75], 'red')
+var b2 = new Box(b1, [10, 0], [25, 25], 'blue')
+var b3 = new Box(b2, [1, 0], [5, 5], 'pink')
 var gui = new dat.GUI({autoPlace: false})
-var controls = {
-  wander: function () {
-    camera.position[0] = Math.random() * 50
-    camera.position[1] = Math.random() * 50
-    camera.rotation = Math.random() * Math.PI * 2
-  }
-}
 
-b3.rotation = Math.PI / 8
-b4.rotation = Math.PI / 8
+b1.rotation = Math.PI / 4
+b2.rotation = Math.PI / 4
+b3.rotation = Math.PI / 4
 
-gui.add(camera.position, '0', -50, 50)
-gui.add(camera.position, '1', -50, 50)
+gui.add(camera.position, '0', -500, 500)
+gui.add(camera.position, '1', -500, 500)
 gui.add(camera, 'rotation', 0, Math.PI * 2)
-gui.add(controls, 'wander')
+
+window.camera = camera
+window.scene = scene
 
 function makeRender () {
   var oldTree = renderScene(STAGE_EL, camera, scene)
