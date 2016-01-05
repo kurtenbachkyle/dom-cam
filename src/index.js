@@ -108,12 +108,25 @@ function renderNode (parentNode, node) {
   return h('div', props, children)
 }
 
+var cache = "";
 function renderFromCamera (camera, node) {
-  var position = vec2.transformMat3([0, 0], node.position, camera.matrixInverse)
-  var xPercent = toPercent(position[0], node.size[0])
-  var yPercent = toPercent(position[1], node.size[1])
+  // var position = vec2.transformMat3([0, 0], node.position, camera.matrixInverse)
+  // var xPercent = toPercent(position[0], node.size[0])
+  // var yPercent = toPercent(position[1], node.size[1])
+  var m = mat3.create();
+  mat3.translate(m, m, node.position)
+  mat3.scale(m, m, node.scale)
+  mat3.rotate(m, m, node.rotation)
+  mat3.multiply(m, m, camera.matrixInverse)
+  if(mat3.str(m)!==cache){
+      cache=mat3.str(m)
+      console.log(mat3.str(m))
+  }
+  var str = "matrix("+m[0]+", "+m[1]+", "+m[2]+", "+m[3]+", "+m[4]+", "+m[5]+")"
+
   var wPercent = toPercent(node.size[0], camera.size[0])
   var hPercent = toPercent(node.size[1], camera.size[1])
+
   var xOffsetPercent = -toPercent(node.size[0] / 2, camera.size[0])
   var yOffsetPercent = -toPercent(node.size[1] / 2, camera.size[1])
   var props = {
@@ -124,9 +137,10 @@ function renderFromCamera (camera, node) {
       width: `${wPercent}%`,
       height: `${hPercent}%`,
       backgroundColor: node.color,
-      transform: `translate3d(${xPercent}%, ${yPercent}%, 0) ` +
-                 `rotate(${toDegrees(node.rotation)}deg) ` +
-                 `scale(${node.scale[0]}, ${node.scale[1]})`
+      // transform: `translate3d(${xPercent}%, ${yPercent}%, 0) ` +
+      //            `scale(${node.scale[0]}, ${node.scale[1]})` +
+      //            `rotate(${toDegrees(camera.rotation-node.rotation)}deg) ` 
+     transform: `${str}`
     }
   }
   var children = node.children.map(n => renderNode(node, n))
