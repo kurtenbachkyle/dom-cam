@@ -31,9 +31,9 @@ function Node (parent, children, position, size) {
     get() { 
       var m = mat3.create()
       
-      mat3.translate(m, m, this.position)
       mat3.scale(m, m, this.scale)
       mat3.rotate(m, m, this.rotation)
+      mat3.translate(m, m, this.position)
       mat3.invert(m, m)
       return m
     }
@@ -42,9 +42,9 @@ function Node (parent, children, position, size) {
     get() {
       var m = mat3.create()
       
-      mat3.translate(m, m, this.position)
       mat3.scale(m, m, this.scale)
       mat3.rotate(m, m, this.rotation)
+      mat3.translate(m, m, this.position)
       return m
     }
   })
@@ -76,8 +76,28 @@ function Root () {
 
 Root.prototype = Object.create(Node.prototype)
 
+function ortho2D(out, left, right, bottom, top) {
+var lr = 1 / (left - right)
+var bt = 1 / (bottom - top)
+
+out[0] = -2 * lr
+out[1] = 0
+out[2] = 0
+
+out[3] = 0
+out[4] = -2 * bt
+out[5] = 0
+
+out[6] = 0
+out[7] = 0
+out[8] = 1
+
+return out
+}
+
 function Camera (position, size) {
   Node.call(this, null, [], position, size)
+  this.projection = ortho2D(mat3.create(), position[0], position[1], size[0], size[1])
 }
 
 Camera.prototype = Object.create(Node.prototype)
@@ -108,39 +128,43 @@ function renderNode (parentNode, node) {
   return h('div', props, children)
 }
 
-var cache = "";
+function mat3ToTransformMatrix(m){
+    return "matrix("+m[0]+", "+m[3]+", "+m[1]+", "+m[4]+", "+m[6]+", "+m[7]+")"
+}
+
+var cache = [];
 function renderFromCamera (camera, node) {
-  // var position = vec2.transformMat3([0, 0], node.position, camera.matrixInverse)
-  // var xPercent = toPercent(position[0], node.size[0])
-  // var yPercent = toPercent(position[1], node.size[1])
+  var position = vec2.transformMat3([0, 0], node.position, camera.matrixInverse)
+  var xPercent = toPercent(position[0], node.size[0])
+  var yPercent = toPercent(position[1], node.size[1])
   var m = mat3.create();
-  mat3.translate(m, m, node.position)
-  mat3.scale(m, m, node.scale)
   mat3.rotate(m, m, node.rotation)
+  mat3.scale(m, m, node.scale)
+  mat3.translate(m, m, node.position)
   mat3.multiply(m, m, camera.matrixInverse)
-  if(mat3.str(m)!==cache){
-      cache=mat3.str(m)
-      console.log(mat3.str(m))
+  if(mat3.str(m)!==cache[node.id]){
+      cache[node.id]=mat3.str(m)
+      console.log("camera: "+mat3ToTransformMatrix(camera.matrix))
+      console.log("node: "+node.id+ " "+mat3ToTransformMatrix(m))
   }
-  var str = "matrix("+m[0]+", "+m[1]+", "+m[2]+", "+m[3]+", "+m[4]+", "+m[5]+")"
 
   var wPercent = toPercent(node.size[0], camera.size[0])
   var hPercent = toPercent(node.size[1], camera.size[1])
 
-  var xOffsetPercent = -toPercent(node.size[0] / 2, camera.size[0])
-  var yOffsetPercent = -toPercent(node.size[1] / 2, camera.size[1])
+  // var xOffsetPercent = -toPercent(node.size[0] / 2, camera.size[0])
+  // var yOffsetPercent = -toPercent(node.size[1] / 2, camera.size[1])
   var props = {
     style: {
       position: 'absolute',
-      left: `${xOffsetPercent}%`,
-      top: `${yOffsetPercent}%`,
+      // left: `${xOffsetPercent}%`,
+      // top: `${yOffsetPercent}%`,
       width: `${wPercent}%`,
       height: `${hPercent}%`,
       backgroundColor: node.color,
       // transform: `translate3d(${xPercent}%, ${yPercent}%, 0) ` +
       //            `scale(${node.scale[0]}, ${node.scale[1]})` +
       //            `rotate(${toDegrees(camera.rotation-node.rotation)}deg) ` 
-     transform: `${str}`
+     transform: `${mat3ToTransformMatrix(m)}`
     }
   }
   var children = node.children.map(n => renderNode(node, n))
@@ -173,17 +197,23 @@ function renderScene (el, camera, scene) {
 
 var camera = new Camera([-240, -135], [480, 270])
 var scene = new Root
-var b1 = new Box(scene, [0, 0], [75, 75], 'red')
+var testPosition = [0, 0];
+var b1 = new Box(scene, testPosition, [75, 75], 'red')
 var b2 = new Box(b1, [10, 0], [25, 25], 'blue')
 var b3 = new Box(b2, [1, 0], [5, 5], 'pink')
+var b4 = new Box(scene, testPosition, [75, 75], 'red')
+var b5 = new Box(b4, [10, 0], [25, 25], 'blue')
+var b6 = new Box(b5, [1, 0], [5, 5], 'pink')
 var gui = new dat.GUI({autoPlace: false})
 
 b1.rotation = Math.PI / 4
 b2.rotation = Math.PI / 4
 b3.rotation = Math.PI / 4
+b5.rotation = Math.PI / 4
+b6.rotation = Math.PI / 4
 
-gui.add(camera.position, '0', -500, 500)
-gui.add(camera.position, '1', -500, 500)
+gui.add(camera.position, '0', -1000, 1000)
+gui.add(camera.position, '1', -1000, 1000)
 gui.add(camera, 'rotation', 0, Math.PI * 2)
 
 window.camera = camera
