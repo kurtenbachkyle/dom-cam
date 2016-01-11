@@ -29,10 +29,10 @@ function Node (parent, children, position, size) {
   })
   Object.defineProperty(this, 'matrixInverse', {
     get() { 
-      var m = mat3.create()
+        var m = mat3.copy(mat3.create(), this.projection)
       
-      mat3.scale(m, m, this.scale)
       mat3.rotate(m, m, this.rotation)
+      mat3.scale(m, m, this.scale)
       mat3.translate(m, m, this.position)
       mat3.invert(m, m)
       return m
@@ -40,10 +40,10 @@ function Node (parent, children, position, size) {
   })
   Object.defineProperty(this, 'matrix', {
     get() {
-      var m = mat3.create()
+        var m = mat3.copy(mat3.create(), this.projection);
       
-      mat3.scale(m, m, this.scale)
       mat3.rotate(m, m, this.rotation)
+      mat3.scale(m, m, this.scale)
       mat3.translate(m, m, this.position)
       return m
     }
@@ -97,6 +97,7 @@ return out
 
 function Camera (position, size) {
   Node.call(this, null, [], position, size)
+  this.scale = [1, 1]
   this.projection = ortho2D(mat3.create(), position[0], position[1], size[0], size[1])
 }
 
@@ -215,6 +216,8 @@ b6.rotation = Math.PI / 4
 gui.add(camera.position, '0', -1000, 1000)
 gui.add(camera.position, '1', -1000, 1000)
 gui.add(camera, 'rotation', 0, Math.PI * 2)
+gui.add(camera.scale, '0', -1000, 1000)
+gui.add(camera.scale, '1', -1000, 1000)
 
 window.camera = camera
 window.scene = scene
